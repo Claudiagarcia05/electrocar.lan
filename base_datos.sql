@@ -1,9 +1,7 @@
--- Eliminar base de datos si existe y crearla de nuevo
 DROP DATABASE IF EXISTS autoelectro;
 CREATE DATABASE autoelectro;
 USE autoelectro;
 
--- Tabla de productos
 CREATE TABLE productos (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(100) NOT NULL,
@@ -21,7 +19,6 @@ CREATE TABLE productos (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabla de usuarios - SIN CHECK constraints para compatibilidad
 CREATE TABLE usuarios (
     id VARCHAR(50) PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -36,7 +33,6 @@ CREATE TABLE usuarios (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabla de categorías
 CREATE TABLE categorias (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(50) NOT NULL,
@@ -44,7 +40,6 @@ CREATE TABLE categorias (
     descripcion TEXT
 );
 
--- Tabla de pedidos
 CREATE TABLE pedidos (
     id INT PRIMARY KEY AUTO_INCREMENT,
     numero_pedido VARCHAR(50) UNIQUE NOT NULL,
@@ -56,7 +51,6 @@ CREATE TABLE pedidos (
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
 
--- Tabla de items del pedido
 CREATE TABLE pedido_items (
     id INT PRIMARY KEY AUTO_INCREMENT,
     pedido_id INT NOT NULL,
@@ -67,7 +61,6 @@ CREATE TABLE pedido_items (
     FOREIGN KEY (producto_id) REFERENCES productos(id)
 );
 
--- Insertar categorías
 INSERT INTO categorias (nombre, icono, descripcion) VALUES
 ('Sistemas de Audio', 'fas fa-music', 'Altavoces, amplificadores y sistemas multimedia para coche'),
 ('Navegación GPS', 'fas fa-map-marker-alt', 'Sistemas de navegación y localización por satélite'),
@@ -75,7 +68,6 @@ INSERT INTO categorias (nombre, icono, descripcion) VALUES
 ('Iluminación LED', 'fas fa-lightbulb', 'Luces LED para interior y exterior del vehículo'),
 ('Herramientas', 'fas fa-tools', 'Herramientas y equipos para instalación y mantenimiento');
 
--- Insertar productos
 INSERT INTO productos (nombre, descripcion, descripcion_corta, precio, categoria_id, disponibilidad, imagen, destacado, oferta, precio_original, descuento, mas_vendido) VALUES
 ('Sistema de Navegación GPS 7"', 'GPS con pantalla táctil de 7 pulgadas, actualizaciones en tiempo real, alertas de radar, puntos de interés y conectividad Bluetooth.', 'GPS profesional para tu coche', 199.99, 2, 1000, 'gps-navegacion.jpg', TRUE, FALSE, NULL, NULL, TRUE),
 ('Altavoces Pioneer 6x9', 'Par de altavoces Pioneer de 6x9 pulgadas, 300W de potencia, respuesta en frecuencia 35Hz-22kHz, cono compuesto IMPP.', 'Altavoces de alta calidad para automóvil', 89.99, 1, 1000, 'altavoces-pioneer.jpg', TRUE, TRUE, 109.99, 18, TRUE),
@@ -85,6 +77,5 @@ INSERT INTO productos (nombre, descripcion, descripcion_corta, precio, categoria
 ('Pantalla Multimedia Android 10"', 'Pantalla táctil Android de 10.1 pulgadas, GPS integrado, Bluetooth, WiFi, compatible con Apple CarPlay y Android Auto.', 'Centro de entretenimiento completo', 299.99, 1, 1000, 'pantalla-android.jpg', TRUE, FALSE, NULL, NULL, FALSE),
 ('Sensores de Aparcamiento 4 Uds', 'Kit de 4 sensores de aparcamiento ultrasónicos, pantalla LCD, alerta audible y visual, instalación profesional recomendada.', 'Aparca con total seguridad', 69.99, 3, 1000, 'sensores-aparcamiento.jpg', FALSE, TRUE, 89.99, 22, TRUE);
 
--- Insertar usuario para pruebas con contraseña SHA1('demo123')
 INSERT INTO usuarios (id, nombre, email, telefono, password_hash, fecha_registro, direccion, ciudad, codigo_postal) VALUES
 ('usr_demo', 'Cliente Demo', 'demo@electrocar.com', '123456789', 'demo123', CURDATE(), 'Calle Falsa 123', 'Madrid', '28001');

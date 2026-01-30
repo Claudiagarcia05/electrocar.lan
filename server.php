@@ -38,7 +38,7 @@
     }
 
     // Obtener la ruta de la solicitud
-    $request = isset($_GET['action']) ? $_GET['action'] : '';
+    $request = $_GET['action'] ?? '';
 
     // Manejar diferentes acciones
     switch ($request) {
@@ -74,8 +74,8 @@
     function getProductos($conn) {
         $sql = "SELECT p.*, c.nombre as categoria_nombre FROM productos p LEFT JOIN categorias c ON p.categoria_id = c.id ORDER BY p.destacado DESC, p.nombre ASC";
         $result = $conn->query($sql);
+        $productos = [];
         if ($result->num_rows > 0) {
-            $productos = [];
             while($row = $result->fetch_assoc()) {
                 // Convertir tipos de datos
                 $row['destacado'] = (bool)$row['destacado'];
@@ -87,8 +87,8 @@
                 $row['descuento'] = $row['descuento'] ? (int)$row['descuento'] : null;
                 $productos[] = $row;
             }
-            echo json_encode($productos);
-        } else { echo json_encode([]); }
+        }
+        echo json_encode($productos);
     }
 
     function getProducto($conn, $id) {
@@ -117,20 +117,20 @@
     function getCategorias($conn) {
         $sql = "SELECT * FROM categorias ORDER BY nombre ASC";
         $result = $conn->query($sql);
+        $categorias = [];
         if ($result->num_rows > 0) {
-            $categorias = [];
             while($row = $result->fetch_assoc()) { 
                 $categorias[] = $row; 
             }
-            echo json_encode($categorias);
-        } else { echo json_encode([]); }
+        }
+        echo json_encode($categorias);
     }
 
     function getProductosDestacados($conn) {
         $sql = "SELECT p.*, c.nombre as categoria_nombre FROM productos p LEFT JOIN categorias c ON p.categoria_id = c.id WHERE p.destacado = 1 ORDER BY p.fecha_creacion DESC LIMIT 5";
         $result = $conn->query($sql);
+        $productos = [];
         if ($result->num_rows > 0) {
-            $productos = [];
             while($row = $result->fetch_assoc()) {
                 // Convertir tipos de datos
                 $row['destacado'] = (bool)$row['destacado'];
@@ -142,8 +142,8 @@
                 $row['descuento'] = $row['descuento'] ? (int)$row['descuento'] : null;
                 $productos[] = $row;
             }
-            echo json_encode($productos);
-        } else { echo json_encode([]); }
+        }
+        echo json_encode($productos);
     }
 
     function loginUsuario($conn) {
@@ -241,9 +241,9 @@
         $nombre = $conn->real_escape_string($data['nombre']);
         $password_hash = $data['password']; // En producción, usar password_hash($data['password'], PASSWORD_DEFAULT)
         $telefono = $conn->real_escape_string($data['telefono']);
-        $direccion = isset($data['direccion']) ? $conn->real_escape_string($data['direccion']) : '';
-        $ciudad = isset($data['ciudad']) ? $conn->real_escape_string($data['ciudad']) : '';
-        $codigo_postal = isset($data['codigo_postal']) ? $conn->real_escape_string($data['codigo_postal']) : '';
+        $direccion = $conn->real_escape_string($data['direccion'] ?? '');
+        $ciudad = $conn->real_escape_string($data['ciudad'] ?? '');
+        $codigo_postal = $conn->real_escape_string($data['codigo_postal'] ?? '');
         $fecha_registro = date('Y-m-d');
         
         $sql = "INSERT INTO usuarios (id, nombre, email, telefono, password_hash, fecha_registro, direccion, ciudad, codigo_postal) VALUES ('$id', '$nombre', '$email', '$telefono', '$password_hash', '$fecha_registro', '$direccion', '$ciudad', '$codigo_postal')";
