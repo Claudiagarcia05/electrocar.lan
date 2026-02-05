@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="es" id="idioma-actual">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ElectroCar - Electrónica para Coches</title>
+        <link rel="stylesheet" href="styles.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link rel="icon" type="image/png" href="logo.png">
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    </head>
+    <body>
+        <div id="app" v-cloak>
+            <!-- División 1: Menú superior -->
+            <div class="menu">
+                <div class="container menu-container">
+                    <div class="logo">
+                        <img src="logo.png" alt="ElectroCar Logo">
+                        <span>ELECTROCAR</span>
+                    </div>
+                    
+                    <div class="nav-menu">
+                        <div class="nav-item">
+                            <a href="#" class="nav-link" @click.prevent="cambiarVista('inicio')">
+                                <i class="fas fa-home"></i> <span>{{ $t('inicio') }}</span>
+                            </a>
+                        </div>
+                        
+                        <div class="nav-item">
+                            <a href="#" class="nav-link" @mouseenter="mostrarDropdown = true" @mouseleave="mostrarDropdown = false">
+                                <i class="fas fa-box-open"></i> <span>{{ $t('productos') }}</span> <i class="fas fa-chevron-down"></i>
+                            </a>
+                            <div class="dropdown dropdown-productos" v-if="mostrarDropdown" @mouseenter="mostrarDropdown = true" @mouseleave="mostrarDropdown = false">
+                                <div class="dropdown-item all-products" @click="cargarTodosProductos()">
+                                    <i class="fas fa-th-large"></i> {{ $t('ver_todos') }}
+                                </div>
+                                <template v-for="categoria in categorias" :key="categoria.id">
+                                    <div v-if="productosPorCategoria(categoria.id).length > 0" class="dropdown-item categoria-header">
+                                        <i :class="categoria.icono || 'fas fa-box'"></i> 
+                                        {{ categoria.nombre }} 
+                                        <span class="categoria-count">({{ productosPorCategoria(categoria.id).length }})</span>
+                                    </div>
+                                    <div v-for="producto in productosPorCategoria(categoria.id).slice(0, 5)" 
+                                        :key="producto.id" 
+                                        class="dropdown-item submenu-item" 
+                                        @click="mostrarProducto(producto.id)">
+                                        <span class="nombre-producto">{{ producto.nombre }}</span>
+                                        <span class="precio">{{ formatearPrecio(producto.precio) }}€</span>
+                                    </div>
+                                    <div v-if="productosPorCategoria(categoria.id).length > 5" class="dropdown-item submenu-item ver-mas" @click="cargarProductosPorCategoria(categoria.id)">
+                                        <i class="fas fa-plus-circle"></i> {{ $t('ver_mas') }}
+                                    </div>
+                                    <div class="categoria-separator"></div>
+                                </template>
+                            </div>
+                        </div>
+                        
+                        <div class="nav-item">
+                            <a href="#" class="nav-link" @click.prevent="cambiarVista('acerca')">
+                                <i class="fas fa-info-circle"></i> <span>{{ $t('acerca') }}</span>
+                            </a>
+                        </div>
+                        
+                        <div class="nav-item">
+                            <a href="#" class="nav-link" @click.prevent="cambiarVista(usuario ? 'perfil' : 'registro')">
+                                <i class="fas fa-user"></i> 
+                                <span id="usuario-texto">
+                                    {{ usuario ? usuario.nombre : $t('registro') }}
+                                </span>
+                            </a>
+                        </div>
+                        
+                        <div class="nav-item">
+                            <a href="#" class="nav-link" @click.prevent="cambiarVista('carrito')">
+                                <i class="fas fa-shopping-cart"></i> <span>{{ $t('carrito') }}</span> 
+                                <span id="carrito-contador" class="carrito-contador" v-if="cantidadTotalCarrito > 0">
+                                    {{ cantidadTotalCarrito }}
+                                </span>
+                            </a>
+                        </div>
+                        
+                        <div class="nav-item">
+                            <div class="idioma-selector" @click="cambiarIdioma()">
+                                <i class="fas fa-globe"></i>
+                                <span id="idioma-texto">{{ idiomaActual.toUpperCase() }}</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- División 2: Carrusel de productos -->
+            <div class="carrusel" v-if="vistaActual === 'inicio' && productosEnCarrusel.length > 0">
+                <div class="container carrusel-container">
+                    <div class="carrusel-slides">
+                        <div v-for="(producto, index) in productosEnCarrusel" 
+                            :key="producto.id"
+                            :class="['carrusel-slide', { 'active': index === carruselIndex }]">
+                            <div class="carrusel-producto">
+                                <div class="carrusel-imagen-container">
+                                    <img :src="producto.imagen" :alt="producto.nombre" class="carrusel-imagen">
+                                </div>
+                                <div class="carrusel-info">
+                                    <h3 class="carrusel-titulo">{{ producto.nombre }}</h3>
+                                    <p class="carrusel-descripcion">{{ producto.descripcion_corta || producto.descripcion?.substring(0, 100) || '' }}</p>
+                                    <div class="carrusel-precio">
+                                        <span v-if="producto.precio_original" class="precio-original">
+                                            {{ formatearPrecio(producto.precio_original) }}€
+                                        </span>
+                                        <span class="precio-actual">{{ formatearPrecio(producto.precio) }}€</span>
+                                        <span v-if="producto.descuento" class="descuento-badge">-{{ producto.descuento }}%</span>
+                                    </div>
+                                    <div class="carrusel-stock">
+                                        <span :class="producto.disponibilidad > 0 ? 'stock-disponible' : 'stock-agotado'">
+                                            <i :class="producto.disponibilidad > 0 ? 'fas fa-check' : 'fas fa-times'"></i>
+                                            {{ producto.disponibilidad > 0 ? 
+                                            `${producto.disponibilidad} ${$t('unidades')}` : 
+                                            $t('agotado') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="carrusel-controls">
+                        <div v-for="(producto, index) in productosEnCarrusel" 
+                            :key="index"
+                            :class="['carrusel-dot', { 'active': index === carruselIndex }]"
+                            @click="cambiarSlide(index)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- División 3: Contenido principal -->
+            <div class="principal">
+                <div class="container">
+                    <!-- Vista: Inicio -->
+                    <div v-if="vistaActual === 'inicio'" class="inicio-contenido">
+                        <h1 class="principal-titulo">{{ $t('bienvenida') }}</h1>
+                        <p class="principal-descripcion">{{ $t('bienvenida-desc') }}</p>
+                        
+                        <div class="destacados">
+                            <h2>{{ $t('destacados') }}</h2>
+                            <div class="productos-grid" v-if="productosDestacados.length > 0">
+                                <div v-for="producto in productosDestacados" 
+                                    :key="producto.id"
+                                    class="producto-card destacado" 
+                                    @click="mostrarProducto(producto.id)">
+                                    <div class="producto-imagen-container">
+                                        <img :src="producto.imagen" :alt="producto.nombre">
+                                        <span v-if="producto.oferta" class="oferta-badge">{{ $t('ofertas') }}</span>
+                                        <span v-if="producto.mas_vendido" class="vendido-badge">{{ $t('mas_vendidos') }}</span>
+                                    </div>
+                                    <div class="producto-card-info">
+                                        <h3>{{ producto.nombre }}</h3>
+                                        <p class="producto-desc-corta">{{ producto.descripcion_corta || producto.descripcion?.substring(0, 100) || '' }}</p>
+                                        <div class="producto-precio-card">
+                                            <span v-if="producto.precio_original" class="precio-original-card">
+                                                {{ formatearPrecio(producto.precio_original) }}€
+                                            </span>
+                                            <span class="precio-actual-card">{{ formatearPrecio(producto.precio) }}€</span>
+                                        </div>
+                                        <button class="btn-ver-detalles" @click.stop="mostrarProducto(producto.id)">
+                                            {{ $t('ver-detalles') }}
+                                        </button>
+                                        <button class="btn-agregar-carrito-mini" 
+                                                @click.stop="agregarAlCarrito(producto.id)"
+                                                :disabled="!usuario || producto.disponibilidad <= 0">
+                                            <i class="fas fa-cart-plus"></i> 
+                                            {{ !usuario ? $t('debe_iniciar_sesion') : $t('agregar') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-else class="sin-productos">
+                                <p>{{ $t('no_productos') }}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="categorias-inicio">
+                            <h2>{{ $t('categorias') }}</h2>
+                            <div class="categorias-grid">
+                                <div v-for="categoria in categorias" 
+                                    :key="categoria.id"
+                                    class="categoria-card" 
+                                    @click="cargarProductosPorCategoria(categoria.id)">
+                                    <i :class="categoria.icono"></i>
+                                    <h3>{{ categoria.nombre }}</h3>
+                                    <p class="categoria-card-count">
+                                        {{ productosPorCategoria(categoria.id).length }} 
+                                        {{ $t('productos') }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista: Detalle de Producto -->
+                    <div v-else-if="vistaActual === 'detalle-producto' && productoSeleccionado" class="producto-detalle-contenedor">
+                        <div class="producto-detalle">
+                            <div class="producto-detalle-header">
+                                <button class="btn-volver" @click="cambiarVista('inicio')">
+                                    <i class="fas fa-arrow-left"></i> {{ $t('volver') }}
+                                </button>
+                            </div>
+                            <div class="producto-detalle-contenido">
+                                <div class="producto-imagen-grande">
+                                    <img :src="productoSeleccionado.imagen" :alt="productoSeleccionado.nombre">
+                                    <div v-if="productoSeleccionado.oferta" class="etiqueta-oferta">
+                                        {{ $t('ofertas') }}
+                                    </div>
+                                    <div v-if="productoSeleccionado.destacado" class="etiqueta-destacado">
+                                        {{ $t('destacados') }}
+                                    </div>
+                                </div>
+                                <div class="producto-info-detalle">
+                                    <h2>{{ productoSeleccionado.nombre }}</h2>
+                                    <p class="categoria-detalle">
+                                        <i class="fas fa-tag"></i> 
+                                        {{ productoSeleccionado.categoria_nombre || $t('sin_categoria') }}
+                                    </p>
+                                    <p class="descripcion-completa">{{ productoSeleccionado.descripcion }}</p>
+                                    
+                                    <div class="detalles-tecnicos">
+                                        <h3>{{ $t('caracteristicas') }}</h3>
+                                        <ul>
+                                            <li><i class="fas fa-check-circle"></i> {{ $t('compra_segura') }}</li>
+                                            <li><i class="fas fa-shipping-fast"></i> {{ $t('envio_gratis') }}</li>
+                                            <li><i class="fas fa-shield-alt"></i> {{ $t('garantia') }}</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="producto-precio-detalle">
+                                        <div v-if="productoSeleccionado.oferta && productoSeleccionado.precio_original" 
+                                            class="producto-oferta-detalle">
+                                            <span class="precio-original-detalle">
+                                                {{ formatearPrecio(productoSeleccionado.precio_original) }}€
+                                            </span>
+                                            <span class="precio-actual-detalle">
+                                                {{ formatearPrecio(productoSeleccionado.precio) }}€
+                                            </span>
+                                            <span v-if="productoSeleccionado.descuento" class="descuento-detalle">
+                                                {{ $t('ahorra') }} {{ productoSeleccionado.descuento }}%
+                                            </span>
+                                        </div>
+                                        <span v-else class="precio-normal-detalle">
+                                            {{ formatearPrecio(productoSeleccionado.precio) }}€
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="producto-disponibilidad-detalle">
+                                        <span :class="productoSeleccionado.disponibilidad > 0 ? 'disponible-detalle' : 'agotado-detalle'">
+                                            <i :class="productoSeleccionado.disponibilidad > 0 ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+                                            {{ productoSeleccionado.disponibilidad > 0 ? 
+                                            $t('disponible') + ': ' + productoSeleccionado.disponibilidad + ' ' + $t('unidades') : 
+                                            $t('agotado') }}
+                                        </span>
+                                    </div>
+                                    
+                                    <div v-if="productoSeleccionado.disponibilidad > 0" class="producto-acciones">
+                                        <div class="cantidad-selector">
+                                            <button class="btn-cantidad" 
+                                                    @click="cantidadProducto > 1 ? cantidadProducto-- : null"
+                                                    :disabled="cantidadProducto <= 1">-</button>
+                                            <input type="number" 
+                                                v-model.number="cantidadProducto" 
+                                                min="1" 
+                                                :max="productoSeleccionado.disponibilidad">
+                                            <button class="btn-cantidad" 
+                                                    @click="cantidadProducto < productoSeleccionado.disponibilidad ? cantidadProducto++ : null"
+                                                    :disabled="cantidadProducto >= productoSeleccionado.disponibilidad">+</button>
+                                        </div>
+                                        <button class="btn-agregar-carrito-detalle" 
+                                                @click="agregarAlCarrito(productoSeleccionado.id)"
+                                                :disabled="!usuario">
+                                            <i class="fas fa-cart-plus"></i> 
+                                            {{ !usuario ? $t('debe_iniciar_sesion') : $t('agregar') }}
+                                        </button>
+                                    </div>
+                                    <div v-else class="sin-stock">
+                                        {{ $t('sin_stock') }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista: Todos los Productos -->
+                    <div v-else-if="vistaActual === 'todos-productos'" class="productos-contenido">
+                        <div class="productos-header">
+                            <h2 class="titulo-seccion">{{ $t('todos_productos') }}</h2>
+                            <button class="btn-volver" @click="cambiarVista('inicio')">
+                                <i class="fas fa-arrow-left"></i> {{ $t('volver') }}
+                            </button>
+                        </div>
+                        <p class="descripcion-seccion">{{ productos.length }} {{ $t('productos_disponibles') }}</p>
+                        <div class="productos-lista">
+                            <div v-for="producto in productos" 
+                                :key="producto.id"
+                                class="producto-lista-item" 
+                                @click="mostrarProducto(producto.id)">
+                                <div class="producto-lista-imagen">
+                                    <img :src="producto.imagen" :alt="producto.nombre">
+                                </div>
+                                <div class="producto-lista-info">
+                                    <h3>{{ producto.nombre }}</h3>
+                                    <p class="producto-lista-desc">{{ producto.descripcion_corta || producto.descripcion?.substring(0, 100) || '' }}</p>
+                                    <div class="producto-lista-detalles">
+                                        <span class="categoria-badge">{{ producto.categoria_nombre || $t('sin_categoria') }}</span>
+                                        <span :class="['stock-info', producto.disponibilidad > 0 ? 'disponible' : 'agotado']">
+                                            {{ producto.disponibilidad > 0 ? 
+                                            producto.disponibilidad + ' ' + $t('unidades') : 
+                                            $t('agotado') }}
+                                        </span>
+                                    </div>
+                                    <div class="producto-lista-precio">
+                                        <span v-if="producto.precio_original" class="precio-original-lista">
+                                            {{ formatearPrecio(producto.precio_original) }}€
+                                        </span>
+                                        <span class="precio-actual-lista">{{ formatearPrecio(producto.precio) }}€</span>
+                                        <span v-if="producto.descuento" class="descuento-lista">-{{ producto.descuento }}%</span>
+                                    </div>
+                                </div>
+                                <div class="producto-lista-acciones">
+                                    <button class="btn-agregar-lista" 
+                                            @click.stop="agregarAlCarrito(producto.id)"
+                                            :disabled="!usuario || producto.disponibilidad <= 0">
+                                        <i class="fas fa-cart-plus"></i> 
+                                        {{ !usuario ? $t('debe_iniciar_sesion') : $t('agregar') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista: Productos por Categoría -->
+                    <div v-else-if="vistaActual.startsWith('categoria-')" class="categoria-contenido">
+                        <div class="categoria-header">
+                            <div class="categoria-info">
+                                <h2>{{ categoriaActual.nombre }}</h2>
+                                <p class="categoria-descripcion">{{ productosCategoriaActual.length }} {{ $t('productos_disponibles') }}</p>
+                            </div>
+                            <button class="btn-volver" @click="cambiarVista('inicio')">
+                                <i class="fas fa-arrow-left"></i> {{ $t('volver') }}
+                            </button>
+                        </div>
+                        
+                        <div v-if="productosCategoriaActual.length > 0" class="productos-categoria-grid">
+                            <div v-for="producto in productosCategoriaActual" 
+                                :key="producto.id"
+                                class="producto-categoria-card" 
+                                @click="mostrarProducto(producto.id)">
+                                <div class="producto-categoria-imagen">
+                                    <img :src="producto.imagen" alt="producto.nombre">
+                                    <span v-if="producto.oferta" class="categoria-oferta-badge">{{ $t('ofertas') }}</span>
+                                </div>
+                                <div class="producto-categoria-info">
+                                    <h3>{{ producto.nombre }}</h3>
+                                    <p class="producto-categoria-desc">{{ producto.descripcion_corta || producto.descripcion?.substring(0, 80) || '' }}</p>
+                                    <div class="producto-categoria-precio">
+                                        <span v-if="producto.precio_original" class="categoria-precio-original">
+                                            {{ formatearPrecio(producto.precio_original) }}€
+                                        </span>
+                                        <span class="categoria-precio-actual">{{ formatearPrecio(producto.precio) }}€</span>
+                                    </div>
+                                    <div class="producto-categoria-stock">
+                                        <span :class="producto.disponibilidad > 0 ? 'categoria-stock-disponible' : 'categoria-stock-agotado'">
+                                            <i :class="producto.disponibilidad > 0 ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+                                            {{ producto.disponibilidad > 0 ? 
+                                            producto.disponibilidad + ' ' + $t('unidades') : 
+                                            $t('agotado') }}
+                                        </span>
+                                    </div>
+                                    <button class="btn-categoria-ver" @click.stop="mostrarProducto(producto.id)">
+                                        <i class="fas fa-eye"></i> {{ $t('ver-detalles') }}
+                                    </button>
+                                    <button class="btn-agregar-categoria" 
+                                            @click.stop="agregarAlCarrito(producto.id)"
+                                            :disabled="!usuario || producto.disponibilidad <= 0">
+                                        <i class="fas fa-cart-plus"></i> 
+                                        {{ !usuario ? $t('debe_iniciar_sesion') : $t('agregar') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="sin-productos-categoria">
+                            <p>{{ $t('no_productos_categoria') }}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista: Carrito -->
+                    <div v-else-if="vistaActual === 'carrito'" class="carrito-contenido">
+                        <div v-if="carrito.length === 0" class="carrito-vacio">
+                            <i class="fas fa-shopping-cart fa-3x"></i>
+                            <h3>{{ $t('carrito_vacio') }}</h3>
+                            <p>{{ $t('agrega_productos') }}</p>
+                            <button class="btn-agregar-carrito" @click="cambiarVista('inicio')">
+                                {{ $t('continuar_comprando') }}
+                            </button>
+                        </div>
+                        <div v-else>
+                            <div class="carrito-header">
+                                <h2>{{ $t('carrito') }}</h2>
+                                <span class="carrito-count">
+                                    {{ cantidadTotalCarrito }} {{ $t('productos') }}
+                                </span>
+                            </div>
+                            
+                            <div class="carrito-items">
+                                <div v-for="(item, index) in carrito" 
+                                    :key="index"
+                                    class="carrito-item">
+                                    <div class="carrito-item-imagen">
+                                        <img :src="obtenerProducto(item.productoId)?.imagen" :alt="obtenerProducto(item.productoId)?.nombre">
+                                    </div>
+                                    <div class="carrito-item-info">
+                                        <h4>{{ obtenerProducto(item.productoId)?.nombre }}</h4>
+                                        <p class="carrito-item-categoria">{{ obtenerProducto(item.productoId)?.categoria_nombre }}</p>
+                                        <div class="carrito-item-precio">
+                                            <span>{{ formatearPrecio(obtenerProducto(item.productoId)?.precio) }}€ x {{ item.cantidad }} = {{ formatearPrecio(obtenerProducto(item.productoId)?.precio * item.cantidad) }}€</span>
+                                        </div>
+                                    </div>
+                                    <div class="carrito-item-cantidad">
+                                        <button class="btn-cantidad-carrito" @click="cambiarCantidadCarrito(index, item.cantidad - 1)">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                        <span class="cantidad-numero">{{ item.cantidad }}</span>
+                                        <button class="btn-cantidad-carrito" @click="cambiarCantidadCarrito(index, item.cantidad + 1)">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                    <button class="btn-eliminar-carrito" @click="eliminarDelCarrito(index)" :title="$t('eliminar')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="carrito-resumen">
+                                <div class="resumen-item">
+                                    <span>{{ $t('subtotal') }}</span>
+                                    <span>{{ totalCarrito }}€</span>
+                                </div>
+                                <div class="resumen-item">
+                                    <span>{{ $t('envio') }}</span>
+                                    <span>{{ $t('gratis') }}</span>
+                                </div>
+                                <div class="resumen-total">
+                                    <span>{{ $t('total') }}:</span>
+                                    <span class="total-precio">{{ totalCarrito }}€</span>
+                                </div>
+                            </div>
+                            
+                            <div class="carrito-acciones">
+                                <button class="btn-carrito btn-cancelar" @click="cambiarVista('inicio')">
+                                    {{ $t('continuar_comprando') }}
+                                </button>
+                                <button class="btn-carrito btn-confirmar" 
+                                        @click="cambiarVista('pago')"
+                                        :disabled="!usuario">
+                                    {{ $t('procesar_pago') }}
+                                </button>
+                            </div>
+                            
+                            <p v-if="!usuario" class="login-required">
+                                {{ $t('debes_iniciar_sesion') }} 
+                                <a href="#" @click.prevent="cambiarVista('registro')">
+                                    {{ $t('inicio_sesion') }}
+                                </a> 
+                                {{ $t('para_pagar') }}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista: Registro/Login -->
+                    <div v-else-if="vistaActual === 'registro'" class="formulario-contenedor">
+                        <formulario-registro
+                            :mostrar-login="mostrarLoginForm"
+                            @cambiar-formulario="mostrarLoginForm = !mostrarLoginForm"
+                            @registro-exitoso="setUsuario"
+                            @login-exitoso="setUsuario">
+                        </formulario-registro>
+                    </div>
+                    
+                        <!-- Vista: Perfil de Usuario -->
+                        <div v-else-if="vistaActual === 'perfil'" class="perfil-contenido">
+                            <div class="perfil-body">
+                                <div class="perfil-info">
+                                    <p><strong>{{ usuario?.nombre }}</strong></p>
+                                    <p>{{ usuario?.email }}</p>
+                                    <p>{{ usuario?.direccion || $t('no_especificada') }}</p>
+                                    <p>{{ usuario?.ciudad || '' }} {{ usuario?.codigo_postal || '' }}</p>
+                                    <p>{{ usuario?.telefono || $t('no_especificado') }}</p>
+                                </div>
+
+                                <div class="perfil-panel">
+                                    <div class="perfil-acciones" style="justify-content: flex-end;">
+                                        <button class="btn-volver" @click="cambiarVista('inicio')">
+                                            <i class="fas fa-arrow-left"></i> {{ $t('volver') }}
+                                        </button>
+                                        <button class="btn-cerrar-sesion" @click="confirmarCerrarSesion()">
+                                            <i class="fas fa-sign-out-alt"></i> {{ $t('cerrar_sesion') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                    <!-- Vista: Acerca de -->
+                    <div v-else-if="vistaActual === 'acerca'" class="acerca-contenido">
+                        <h2>{{ $t('acerca_titulo') }}</h2>
+                        <p>{{ $t('acerca_desc1') }}</p>
+                        <p>{{ $t('acerca_desc2') }}</p>
+                        <p>{{ $t('acerca_mision') }}</p>
+                        
+                        <div class="valores">
+                            <h3>{{ $t('nuestros_valores') }}</h3>
+                            <div class="valores-grid">
+                                <div class="valor-item">
+                                    <i class="fas fa-medal"></i>
+                                    <h4>{{ $t('calidad') }}</h4>
+                                    <p>{{ $t('desc_calidad') }}</p>
+                                </div>
+                                <div class="valor-item">
+                                    <i class="fas fa-headset"></i>
+                                    <h4>{{ $t('soporte') }}</h4>
+                                    <p>{{ $t('desc_soporte') }}</p>
+                                </div>
+                                <div class="valor-item">
+                                    <i class="fas fa-shipping-fast"></i>
+                                    <h4>{{ $t('envio_rapido') }}</h4>
+                                    <p>{{ $t('desc_envio') }}</p>
+                                </div>
+                                <div class="valor-item">
+                                    <i class="fas fa-shield-alt"></i>
+                                    <h4>{{ $t('garantia') }}</h4>
+                                    <p>{{ $t('desc_garantia') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista: Pago -->
+                    <div v-else-if="vistaActual === 'pago'" class="pago-contenido">
+                        <div class="pago-header">
+                            <button class="btn-volver" @click="cambiarVista('carrito')">
+                                <i class="fas fa-arrow-left"></i> {{ $t('volver_carrito') }}
+                            </button>
+                            <h2>{{ $t('procesar_pago') }}</h2>
+                        </div>
+                        <div class="pago-grid">
+                            <div class="pago-formulario">
+                                <h3>{{ $t('datos_pago') }}</h3>
+                                <div class="form-group">
+                                    <label for="metodo-pago">{{ $t('metodo_pago') }} *</label>
+                                    <select id="metodo-pago" class="form-control" v-model="metodoPago">
+                                        <option value="tarjeta">{{ $t('tarjeta_credito') }}</option>
+                                        <option value="debito">{{ $t('tarjeta_debito') }}</option>
+                                        <option value="paypal">{{ $t('paypal') }}</option>
+                                    </select>
+                                </div>
+                                
+                                <div v-if="metodoPago !== 'paypal'" id="datos-tarjeta">
+                                    <div class="form-group">
+                                        <label for="titular-tarjeta">{{ $t('titular_tarjeta') }} *</label>
+                                        <input type="text" id="titular-tarjeta" v-model="formPago.titular" 
+                                            :placeholder="$t('ejemplo_titular')" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="numero-tarjeta">{{ $t('numero_tarjeta') }} *</label>
+                                        <input type="text" id="numero-tarjeta" v-model="formPago.numero_tarjeta" 
+                                            :placeholder="$t('ejemplo_tarjeta')" required maxlength="19"
+                                            @input="formatearNumeroTarjeta">
+                                    </div>
+                                    <div class="form-fila">
+                                        <div class="form-group">
+                                            <label for="fecha-vencimiento">{{ $t('fecha_vencimiento') }} *</label>
+                                            <input type="text" id="fecha-vencimiento" v-model="formPago.fecha_vencimiento" 
+                                                :placeholder="$t('ejemplo_fecha')" required maxlength="5"
+                                                @input="formatearFechaVencimiento">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cvv">{{ $t('cvv') }} *</label>
+                                            <input type="text" id="cvv" v-model="formPago.cvv" 
+                                                :placeholder="$t('ejemplo_cvv')" required maxlength="3"
+                                                @input="formPago.cvv = formPago.cvv.replace(/\D/g, '')">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div v-else id="datos-paypal">
+                                    <div class="paypal-info">
+                                        <p>{{ $t('paypal_info') }}</p>
+                                    </div>
+                                </div>
+                                
+                                <button class="btn-submit" @click="procesarPago" :disabled="procesandoPago">
+                                    <i class="fas fa-lock"></i> 
+                                    <span v-if="procesandoPago">
+                                        {{ $t('procesando_pago') }}
+                                    </span>
+                                    <span v-else>
+                                        {{ $t('pagar_ahora') }} - {{ totalCarrito }}€
+                                    </span>
+                                </button>
+                            </div>
+                            
+                            <div class="pago-resumen">
+                                <h3>{{ $t('resumen_pedido') }}</h3>
+                                <div class="resumen-pedido">
+                                    <div v-for="(item, index) in carrito" 
+                                        :key="index"
+                                        class="resumen-item-pedido">
+                                        <span>{{ obtenerProducto(item.productoId)?.nombre }} x{{ item.cantidad }}</span>
+                                        <span>{{ formatearPrecio(obtenerProducto(item.productoId)?.precio * item.cantidad) }}€</span>
+                                    </div>
+                                    <div class="resumen-total-pedido">
+                                        <strong>{{ $t('total') }}</strong>
+                                        <strong>{{ totalCarrito }}€</strong>
+                                    </div>
+                                </div>
+                                
+                                <div class="datos-envio">
+                                    <div class="datos-envio-header">
+                                        <h4>{{ $t('datos_envio') }}</h4>
+                                        <button class="btn-modificar-direccion" @click="mostrarModificarDireccion = true">
+                                            <i class="fas fa-edit"></i> {{ $t('modificar_direccion') }}
+                                        </button>
+                                    </div>
+                                    <div v-if="!mostrarModificarDireccion" id="datos-envio-actuales">
+                                        <p><strong>{{ usuario?.nombre }}</strong></p>
+                                        <p>{{ usuario?.direccion || $t('no_especificada') }}</p>
+                                        <p>{{ usuario?.ciudad || '' }} {{ usuario?.codigo_postal || '' }}</p>
+                                        <p>{{ usuario?.telefono || $t('no_especificado') }}</p>
+                                        <p>{{ usuario?.email }}</p>
+                                    </div>
+                                    <div v-else id="form-modificar-direccion">
+                                        <div class="form-group">
+                                            <label for="modificar-direccion">{{ $t('direccion') }}</label>
+                                            <input type="text" id="modificar-direccion" v-model="formDireccion.direccion">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="modificar-ciudad">{{ $t('ciudad') }}</label>
+                                            <input type="text" id="modificar-ciudad" v-model="formDireccion.ciudad">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="modificar-codigo-postal">{{ $t('codigo_postal') }}</label>
+                                            <input type="text" id="modificar-codigo-postal" v-model="formDireccion.codigo_postal">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="modificar-telefono">{{ $t('telefono') }}</label>
+                                            <input type="tel" id="modificar-telefono" v-model="formDireccion.telefono">
+                                        </div>
+                                        <div class="form-acciones-direccion">
+                                            <button class="btn-guardar-direccion" @click="guardarDireccion()">
+                                                <i class="fas fa-save"></i> {{ $t('guardar_direccion') }}
+                                            </button>
+                                            <button class="btn-cancelar-direccion" @click="mostrarModificarDireccion = false">
+                                                <i class="fas fa-times"></i> {{ $t('cancelar') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vista: Confirmación de Pago -->
+                    <div v-else-if="vistaActual === 'confirmacion-pago'" class="confirmacion-pago">
+                        <div class="confirmacion-icono">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h2>{{ $t('pago_exitoso') }}</h2>
+                        <p class="confirmacion-mensaje">{{ $t('gracias_compra') }}</p>
+                        
+                        <div class="confirmacion-datos">
+                            <div class="confirmacion-item">
+                                <span>{{ $t('numero_pedido') }}:</span>
+                                <strong>{{ pedidoConfirmado?.numero_pedido }}</strong>
+                            </div>
+                            <div class="confirmacion-item">
+                                <span>{{ $t('total') }}:</span>
+                                <strong>{{ pedidoConfirmado?.total }}€</strong>
+                            </div>
+                            <div class="confirmacion-item">
+                                <span>{{ $t('fecha') }}:</span>
+                                <strong>{{ new Date().toLocaleDateString() }}</strong>
+                            </div>
+                            <div class="confirmacion-item">
+                                <span>{{ $t('metodo_pago') }}:</span>
+                                <strong>{{ metodoPagoTexto }}</strong>
+                            </div>
+                        </div>
+                        
+                        <div class="confirmacion-acciones">
+                            <button class="btn-confirmacion" @click="cambiarVista('inicio')">
+                                <i class="fas fa-home"></i> {{ $t('seguir_comprando') }}
+                            </button>
+                        </div>
+                        
+                        <div class="confirmacion-info">
+                            <p><i class="fas fa-info-circle"></i> {{ $t('correo_enviado') }} {{ usuario?.email }}</p>
+                            <p><i class="fas fa-truck"></i> {{ $t('envio_24_48') }}</p>
+                        </div>
+                    </div>
+                    
+                    <div v-else-if="cargando" class="cargando">
+                        <i class="fas fa-spinner fa-spin fa-3x"></i>
+                        <p>{{ $t('cargando') }}</p>
+                    </div>
+                    
+                    <div v-else class="vista-no-encontrada">
+                        <h2>Vista no encontrada</h2>
+                        <button class="btn-volver" @click="cambiarVista('inicio')">
+                            <i class="fas fa-home"></i> Volver al inicio
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- División 4: Información adicional -->
+            <div class="info-adicional">
+                <div class="container">
+                    <div class="info-grid">
+                        <div class="info-col">
+                            <h3>{{ $t('contacto') }}</h3>
+                            <p><i class="fas fa-map-marker-alt"></i> Calle Electrónica 123, Madrid</p>
+                            <p><i class="fas fa-phone"></i> +34 910 123 456</p>
+                            <p><i class="fas fa-envelope"></i> info@electrocar.com</p>
+                        </div>
+                        
+                        <div class="info-col">
+                            <h3>{{ $t('horario') }}</h3>
+                            <p>Lunes a Viernes: 9:00 - 18:00</p>
+                            <p>Sábados: 10:00 - 14:00</p>
+                            <p>Domingos: Cerrado</p>
+                        </div>
+                        
+                        <div class="info-col">
+                            <h3>{{ $t('legal') }}</h3>
+                            <p>{{ $t('privacidad') }}</p>
+                            <p>{{ $t('cookies') }}</p>
+                            <p>{{ $t('terminos') }}</p>
+                        </div>
+                        
+                        <div class="info-col">
+                            <h3>{{ $t('redes') }}</h3>
+                            <div class="redes-sociales">
+                                <i class="fab fa-facebook"></i>
+                                <i class="fab fa-twitter"></i>
+                                <i class="fab fa-instagram"></i>
+                                <i class="fab fa-youtube"></i>
+                            </div>
+                            <p class="copyright">&copy; 2025 ElectroCar. Todos los derechos reservados.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="translations_es.js"></script>
+        <script src="translations_en.js"></script>
+        <script src="script.js"></script>
+        <script src="app.js"></script>
+    </body>
+</html>
